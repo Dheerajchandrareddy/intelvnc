@@ -1,0 +1,48 @@
+FROM registry.access.redhat.com/ubi8/ubi:8.5
+
+### Required OpenShift Labels
+LABEL name="uniserve360" \
+      maintainer="jnanendra.v@intense.in" \
+      vendor="IntenseTechnologies" \
+      version="1.0" \
+      release="1.1" \
+      summary="Uniserve360 dockerized application" \
+      description="Uniserve360 dockerized application qt enabled"
+##Adding Dependecy packages
+RUN  yum -y install java-1.8.0-openjdk.x86_64 java-1.8.0-openjdk-devel.x86_64
+RUN yum install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+RUN yum install -y libXrender libXext fontconfig freetype libaio zip unzip libicui18n* libGL net-tools procps hostname iputils postgresql12 postgresql12-libs
+ADD rpm1 /tmp/rpm1
+RUN yum install -y /tmp/rpm1/*.rpm
+## Adding Application User with Sandbox UID
+RUN groupadd -g 1014590000 intense;useradd -m -u 1014590000 -g 1014590000 -d /home/intense -s /bin/bash intense;echo 'intense:intense' | chpasswd
+ADD dep_libs/* /usr/lib64/
+RUN chmod 755 -R /usr/lib64/
+WORKDIR /home/intense
+
+##Adding UniServe360 Binariies
+ADD UniServe /home/intense/UniServe
+
+##Copy Vncserver PreConfigured files
+ADD .fonts /home/intense/.fonts
+ADD twm/etc/X11/ /etc/X11
+ADD twm/usr/bin /usr/bin
+ADD twm/usr/share /usr/share
+COPY .vnc /home/intense/.vnc
+COPY QtSoftware.conf /etc/xdg/QtSoftware.conf
+COPY iECCM.conf /home/intense/.config/Intense/iECCM.conf
+COPY start.sh /home/intense/start.sh
+##Adding Required Permissions
+RUN chmod 755 /home/intense/.fonts
+RUN chmod 755 /home/intense/.vnc
+RUN chmod 700 /home/intense/.vnc/*
+RUN chown -R 1014590000:1014590000 /home/intense
+RUN chmod 755 -R /home/intense/UniServe
+RUN chmod 755 -R /etc/xdg
+RUN chown -R 1014590000:1014590000 /etc/xdg
+RUN ln -sf /usr/share/zoneinfo/Asia/Kolkata /etc/localtime
+##Run Pod with Sandbox UID
+USER 1014590000
+RUN echo 'export RSDIR=/home/intense/UniServe' >> /home/intense/.bash_profile
+RUN echo 'export PATH=$PATH:$HOME/bin:$RSDIR/bin' >> /home/intense/.bash_profile
+RUN echo 'export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$RSDIR/lib' >> /home/intense/.bash_profile
